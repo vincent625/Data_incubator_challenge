@@ -1,0 +1,100 @@
+import sys
+import scipy
+import numpy
+import matplotlib
+import pandas
+import sklearn
+import operator
+
+import pandas
+from pandas.tools.plotting import scatter_matrix
+import matplotlib.pyplot as plt
+from sklearn import model_selection
+from sklearn.metrics import classification_report
+from sklearn.metrics import confusion_matrix
+from sklearn.metrics import accuracy_score
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn.naive_bayes import GaussianNB
+from sklearn.svm import SVC
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.feature_extraction.text import TfidfVectorizer
+from scipy import sparse
+
+# read review file and usefulness category
+dataset = pandas.read_csv("Orlando-reviews.csv",names=['restaurant name','review date','review','rating','useful','funny','cool','user name','ID','# pics'])
+yelp = pandas.read_csv("yelp.csv")
+
+# extract review column for tf-idf
+corpus=dataset.values[:,2]
+vectorizer = TfidfVectorizer(analyzer='word', stop_words='english', max_features=100)
+X_sparse = vectorizer.fit_transform(corpus)
+tfidfx=X_sparse.toarray()
+
+idf = vectorizer.idf_
+d=dict(zip(vectorizer.get_feature_names(), idf))
+sorted_d = sorted(d.items(), key=operator.itemgetter(1))
+sorted_d[80:]
+
+# save sorted words frequency
+df_sorted_d=pandas.DataFrame(sorted_d)
+df_sorted_d.to_csv('sorted_d.csv')
+
+df_d =pandas.DataFrame(d,index=[0])
+df_d.to_csv('df_d.csv')
+
+# combine words frequency and other features to X, and usefulness to Y
+yelpx = yelp.values[:,0:4]
+X=numpy.hstack((tfidfx,yelpx))
+Y = yelp.values[:,4]
+
+# take 80% for training set, and 20% for validation set
+validation_size = 0.20
+seed = 7
+X_train, X_validation, Y_train, Y_validation = model_selection.train_test_split(X, Y, test_size=validation_size, random_state=seed)
+scoring = 'accuracy'
+
+# different ML will be tested to see which one has highest accuracy
+models = []
+models.append(('LR', LogisticRegression()))
+models.append(('RF', RandomForestClassifier()))
+
+models.append(('LDA', LinearDiscriminantAnalysis()))
+models.append(('KNN', KNeighborsClassifier()))
+models.append(('CART', DecisionTreeClassifier()))
+models.append(('NB', GaussianNB()))
+
+# 10-fold cross validation using training set
+results = []
+names = []
+for name, model in models:
+     kfold = model_selection.KFold(n_splits=10, random_state=seed)
+     cv_results = model_selection.cross_val_score(model, X_train, Y_train, cv=kfold, scoring=scoring)
+     results.append(cv_results)
+     names.append(name)
+     msg = "%s: %f (%f)" % (name, cv_results.mean(), cv_results.std())
+     print(msg)
+      
+# compare algorithm plot
+fig = plt.figure()
+fig.suptitle('Algorithm Comparison')
+ax = fig.add_subplot(111)
+plt.boxplot(results)
+ax.set_xticklabels(names)
+plt.show()
+fig.savefig('compare.pdf')
+
+# make prediction using validation set with LR
+lr =  LogisticRegression()
+
+lr.fit(X_train, Y_train)
+predictions = lr.predict(X_validation)
+print(accuracy_score(Y_validation, predictions))
+print(confusion_matrix(Y_validation, predictions))
+print(classification_report(Y_validation, predictions))
+
+# save LR coefficient
+df_lr_coef=pandas.DataFrame(lr.coef_[0])
+df_lr_coef.to_csv('df_lr_coef.csv')
