@@ -1,6 +1,8 @@
 Data is cracped from
 https://www.yelp.com/
 
+100 Mb of data on Yelp reviews on Orlando, FL restaurants from 2005 to 2017. The data includes 907 restaurants and 134,491 reviews. 
+
 in the format of :
 'restaurant name','review date','review','rating','# useful','# funny','# cool','user name','ID','pics'
 
